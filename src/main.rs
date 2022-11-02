@@ -13,6 +13,11 @@ struct Data {
 #[derive(Component)]
 struct Controllable;
 
+#[derive(Component)]
+struct TankControllable {
+    angle: i32,
+}
+
 fn main() {
     App::new()
         .insert_resource(AmbientLight {
@@ -25,7 +30,7 @@ fn main() {
         .add_plugin(DebugLinesPlugin::with_depth_test(true))
         .add_startup_system(build_world)
         .add_system(focus_camera)
-        .add_system(manage_input)
+        .add_system(manage_tank_input)
         .run();
 }
 
@@ -72,7 +77,7 @@ fn build_world(
     commands
         .spawn_bundle(PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Plane { size: 50.0 })),
-            material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
+            material: materials.add(Color::rgb(0.3, 1.0, 0.3).into()),
             transform: flat_plane_transform,
             ..default()
         })
@@ -80,11 +85,18 @@ fn build_world(
     commands
         .spawn_bundle(SceneBundle {
             scene: asset_server.load("trashcan.gltf#Scene0"),
+            transform: Transform::from_xyz(5.0, 5.0, 0.0),
+            ..default()
+        })
+        .insert(Name::new("trashcan"));
+    commands
+        .spawn_bundle(SceneBundle {
+            scene: asset_server.load("debug.gltf#Scene0"),
             transform: Transform::from_xyz(0.0, 0.0, 0.0),
             ..default()
         })
-        .insert(Name::new("trashcan"))
-        .insert(Controllable);
+        .insert(Name::new("Debug Boy"))
+        .insert(TankControllable { angle: 0 });
 }
 
 // fn animate_light_direction(
@@ -103,38 +115,61 @@ fn build_world(
     
 fn focus_camera(
     mut cameras: Query<&mut Transform, With<Camera3d>>,
-    objects: Query<&Transform, (With<Controllable>, Without<Camera3d>)>
+    objects: Query<&Transform, (With<TankControllable>, Without<Camera3d>)>
 ) {
     for mut camera in &mut cameras {
         for obj in &objects {
             camera.rotation = camera.looking_at(obj.translation, Vec3::Z).rotation;
-            break;
+            break; // Still need to figure out how to only access a single object
         }
     }
 }
 
-fn manage_input (
+// fn manage_input (
+//     keys: Res<Input<KeyCode>>,
+//     mut transforms: Query<&mut Transform, With<Controllable>>
+// ){
+//     for mut transform in &mut transforms {
+//         if transform.translation.z > 0.0 {
+//             transform.translation.z -= 0.1;
+//         }
+//         if keys.pressed(KeyCode::Left) {
+//             transform.translation.y -= 0.1;
+//         } else if keys.pressed(KeyCode::Right) {
+//             transform.translation.y += 0.1;
+//         }
+
+//         if keys.pressed(KeyCode::Up) {
+//             transform.translation.x -= 0.1;
+//         } else if keys.pressed(KeyCode::Down) {
+//             transform.translation.x += 0.1;
+//         }
+
+//         if keys.pressed(KeyCode::Space) {
+//             transform.translation.z += 0.69;
+//         }
+//     }
+// }
+
+fn manage_tank_input(
     keys: Res<Input<KeyCode>>,
-    mut transforms: Query<&mut Transform, With<Controllable>>
-){
-    for mut transform in &mut transforms {
-        if transform.translation.z > 0.0 {
-            transform.translation.z -= 0.1;
-        }
+    mut query: Query<(&mut Transform, &mut TankControllable)>
+) {
+    for (mut transform, mut tank) in query.iter_mut() {
         if keys.pressed(KeyCode::Left) {
-            transform.translation.y -= 0.1;
+            tank.angle += 2;
+            if tank.angle > 360 { tank.angle = 0; }
         } else if keys.pressed(KeyCode::Right) {
-            transform.translation.y += 0.1;
+            tank.angle -= 2;
+            if tank.angle < 0 { tank.angle = 360; }
         }
+        transform.rotation = Quat::from_rotation_z(deg_to_rad(tank.angle as f32));
 
         if keys.pressed(KeyCode::Up) {
-            transform.translation.x -= 0.1;
-        } else if keys.pressed(KeyCode::Down) {
-            transform.translation.x += 0.1;
-        }
-
-        if keys.pressed(KeyCode::Space) {
-            transform.translation.z += 0.69;
+            let speed: f32 = 0.25;
+            let rotation_angle: f32 = tank.angle as f32 + 90.0;
+            transform.translation.x += f32::cos(deg_to_rad(rotation_angle)) * speed;
+            transform.translation.y += f32::sin(deg_to_rad(rotation_angle)) * speed;
         }
     }
 }
