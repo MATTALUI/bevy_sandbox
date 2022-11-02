@@ -2,6 +2,8 @@ use bevy::prelude::*;
 use bevy_prototype_debug_lines::*;
 use bevy_inspector_egui::{InspectorPlugin, Inspectable, WorldInspectorPlugin};
 
+mod utils;
+
 #[derive(Inspectable, Default)]
 struct Data {
     should_render: bool,
@@ -73,7 +75,7 @@ fn build_world(
         .insert(Name::new("Origin Marker"));
 
     let mut flat_plane_transform: Transform = Transform::from_xyz(0.0, 0.0, -1.3);
-    flat_plane_transform.rotation = Quat::from_rotation_x(deg_to_rad(90.0));
+    flat_plane_transform.rotation = Quat::from_rotation_x(utils::deg_to_rad(90.0));
     commands
         .spawn_bundle(PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Plane { size: 50.0 })),
@@ -99,20 +101,6 @@ fn build_world(
         .insert(TankControllable { angle: 0 });
 }
 
-// fn animate_light_direction(
-//     time: Res<Time>,
-//     mut query: Query<&mut Transform, With<DirectionalLight>>,
-// ) {
-//     for mut transform in &mut query {
-//         transform.rotation = Quat::from_euler(
-//             EulerRot::ZYX,
-//             0.0,
-//             time.seconds_since_startup() as f32 * std::f32::consts::TAU / 10.0,
-//             -std::f32::consts::FRAC_PI_4,
-//         );
-//     }
-// }
-    
 fn focus_camera(
     mut cameras: Query<&mut Transform, With<Camera3d>>,
     objects: Query<&Transform, (With<TankControllable>, Without<Camera3d>)>
@@ -124,32 +112,6 @@ fn focus_camera(
         }
     }
 }
-
-// fn manage_input (
-//     keys: Res<Input<KeyCode>>,
-//     mut transforms: Query<&mut Transform, With<Controllable>>
-// ){
-//     for mut transform in &mut transforms {
-//         if transform.translation.z > 0.0 {
-//             transform.translation.z -= 0.1;
-//         }
-//         if keys.pressed(KeyCode::Left) {
-//             transform.translation.y -= 0.1;
-//         } else if keys.pressed(KeyCode::Right) {
-//             transform.translation.y += 0.1;
-//         }
-
-//         if keys.pressed(KeyCode::Up) {
-//             transform.translation.x -= 0.1;
-//         } else if keys.pressed(KeyCode::Down) {
-//             transform.translation.x += 0.1;
-//         }
-
-//         if keys.pressed(KeyCode::Space) {
-//             transform.translation.z += 0.69;
-//         }
-//     }
-// }
 
 fn manage_tank_input(
     keys: Res<Input<KeyCode>>,
@@ -163,17 +125,14 @@ fn manage_tank_input(
             tank.angle -= 2;
             if tank.angle < 0 { tank.angle = 360; }
         }
-        transform.rotation = Quat::from_rotation_z(deg_to_rad(tank.angle as f32));
+        transform.rotation = Quat::from_rotation_z(utils::deg_to_rad(tank.angle as f32));
 
         if keys.pressed(KeyCode::Up) {
-            let speed: f32 = 0.25;
+            // We add 90 to the rotation angle to account for differences in world axis and the orientation of the model.
             let rotation_angle: f32 = tank.angle as f32 + 90.0;
-            transform.translation.x += f32::cos(deg_to_rad(rotation_angle)) * speed;
-            transform.translation.y += f32::sin(deg_to_rad(rotation_angle)) * speed;
+            let speed: f32 = 0.25;
+            transform.translation.x += f32::cos(utils::deg_to_rad(rotation_angle)) * speed;
+            transform.translation.y += f32::sin(utils::deg_to_rad(rotation_angle)) * speed;
         }
     }
-}
-
-fn deg_to_rad(degrees: f32) -> f32 {
-    return degrees * (std::f32::consts::PI / 180.0);
 }
