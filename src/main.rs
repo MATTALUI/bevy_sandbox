@@ -10,6 +10,9 @@ struct Data {
     size: f32,
 }
 
+#[derive(Component)]
+struct Controllable;
+
 fn main() {
     App::new()
         .insert_resource(AmbientLight {
@@ -32,43 +35,56 @@ fn build_world(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    commands.spawn_bundle(Camera3dBundle {
-        transform: Transform::from_xyz(15.0, 0.0, 5.0).looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Z),
-        ..default()
-    });
-    const HALF_SIZE: f32 = 1.0;
-    commands.spawn_bundle(DirectionalLightBundle {
-        directional_light: DirectionalLight {
-            shadow_projection: OrthographicProjection {
-                left: -HALF_SIZE,
-                right: HALF_SIZE,
-                bottom: -HALF_SIZE,
-                top: HALF_SIZE,
-                near: -10.0 * HALF_SIZE,
-                far: 10.0 * HALF_SIZE,
+    commands
+        .spawn_bundle(Camera3dBundle {
+            transform: Transform::from_xyz(15.0, 0.0, 5.0).looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Z),
+            ..default()
+        });
+    const HALF_SIZE: f32 = 25.0;
+    commands
+        .spawn_bundle(DirectionalLightBundle {
+            directional_light: DirectionalLight {
+                shadow_projection: OrthographicProjection {
+                    left: -HALF_SIZE,
+                    right: HALF_SIZE,
+                    bottom: -HALF_SIZE,
+                    top: HALF_SIZE,
+                    near: -10.0 * HALF_SIZE,
+                    far: 10.0 * HALF_SIZE,
+                    ..default()
+                },
+                shadows_enabled: true,
                 ..default()
             },
-            shadows_enabled: true,
             ..default()
-        },
-        ..default()
-    });
-    commands.spawn_bundle(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::UVSphere { radius: 0.5, sectors: 25, stacks: 25 })),
-        material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
-        transform: Transform::from_xyz(0.0, 0.0, 0.0),
-        ..default()
-    });
-    commands.spawn_bundle(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Plane { size: 50.0 })),
-        material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
-        ..default()
-    });
-    commands.spawn_bundle(SceneBundle {
-        scene: asset_server.load("trashcan.gltf#Scene0"),
-        transform: Transform::from_xyz(0.0, 0.0, 0.0),
-        ..default()
-    }).insert(Name::new("trashcan"));
+        });
+    commands
+        .spawn_bundle(PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::UVSphere { radius: 0.25, sectors: 15, stacks: 15 })),
+            material: materials.add(Color::rgb(1.0, 0.1, 0.1).into()),
+            transform: Transform::from_xyz(0.0, 0.0, 0.0),
+            ..default()
+        })
+        .insert(Name::new("Origin Marker"));
+
+    let mut flat_plane_transform: Transform = Transform::from_xyz(0.0, 0.0, -1.3);
+    flat_plane_transform.rotation = Quat::from_rotation_x(deg_to_rad(90.0));
+    commands
+        .spawn_bundle(PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Plane { size: 50.0 })),
+            material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
+            transform: flat_plane_transform,
+            ..default()
+        })
+        .insert(Name::new("Ground"));
+    commands
+        .spawn_bundle(SceneBundle {
+            scene: asset_server.load("trashcan.gltf#Scene0"),
+            transform: Transform::from_xyz(0.0, 0.0, 0.0),
+            ..default()
+        })
+        .insert(Name::new("trashcan"))
+        .insert(Controllable);
 }
 
 // fn animate_light_direction(
@@ -87,7 +103,7 @@ fn build_world(
     
 fn focus_camera(
     mut cameras: Query<&mut Transform, With<Camera3d>>,
-    objects: Query<&Transform, (With<Name>, Without<Camera3d>)>
+    objects: Query<&Transform, (With<Controllable>, Without<Camera3d>)>
 ) {
     for mut camera in &mut cameras {
         for obj in &objects {
@@ -99,7 +115,7 @@ fn focus_camera(
 
 fn manage_input (
     keys: Res<Input<KeyCode>>,
-    mut transforms: Query<&mut Transform, With<Name>>
+    mut transforms: Query<&mut Transform, With<Controllable>>
 ){
     for mut transform in &mut transforms {
         if transform.translation.z > 0.0 {
@@ -120,7 +136,9 @@ fn manage_input (
         if keys.pressed(KeyCode::Space) {
             transform.translation.z += 0.69;
         }
-
-        break;
     }
+}
+
+fn deg_to_rad(degrees: f32) -> f32 {
+    return degrees * (std::f32::consts::PI / 180.0);
 }
