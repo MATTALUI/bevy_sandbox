@@ -16,6 +16,9 @@ struct Data {
 struct Controllable;
 
 #[derive(Component)]
+struct WorldChunk;
+
+#[derive(Component)]
 struct TrackingCamera;
 
 #[derive(Component)]
@@ -35,6 +38,7 @@ fn main() {
         .add_plugin(DebugLinesPlugin::with_depth_test(true))
         .add_startup_system(build_world)
         .add_system(manage_tank_input)
+        .add_system(update_ground_chunks)
         .add_system(focus_camera)
         .add_system(focus_tracking_camera)
         .run();
@@ -54,12 +58,12 @@ fn build_world(
     //     .insert(Name::new("Debug Camera"));
     commands
         .spawn_bundle(Camera3dBundle {
-            transform: Transform::from_xyz(0.0, -15.0, 10.0).looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Z),
+            transform: Transform::from_xyz(0.0, -15.0, 6.0).looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Z),
             ..default()
         })
         .insert(TrackingCamera)
         .insert(Name::new("Trailing Camera"));
-    const HALF_SIZE: f32 = 25.0;
+    const HALF_SIZE: f32 = 50.0;
     commands
         .spawn_bundle(DirectionalLightBundle {
             directional_light: DirectionalLight {
@@ -102,17 +106,34 @@ fn build_world(
             ..default()
         })
         .insert(Name::new("Y Marker"));
+    
+    let mut i = 0;
+    let ground_colors = [
+        Color::rgb(0.3, 1.0, 0.3),
+        Color::rgb(0.9, 0.9, 0.9),
+        Color::rgb(0.3, 1.0, 0.3),
+        Color::rgb(0.9, 0.9, 0.9),
+    ];
+    let ground_size = 50.0;
+    while i < 4 {
+        let mut flat_plane_transform: Transform = Transform::from_xyz(0.0, 0.0, -1.3);
+        flat_plane_transform.rotation = Quat::from_rotation_x(utils::deg_to_rad(90.0));
+        flat_plane_transform.translation.y += 50.0 * (i as f32);
+        flat_plane_transform.translation.z = utils:: calc_world_curve_path(flat_plane_transform.translation.y);
+        flat_plane_transform.scale.x = 2.0;
+        let name = format!("Ground {}", i + 1);
+        commands
+            .spawn_bundle(PbrBundle {
+                mesh: meshes.add(Mesh::from(shape::Plane { size: ground_size })),
+                material: materials.add(ground_colors[i].into()),
+                transform: flat_plane_transform,
+                ..default()
+            })
+            .insert(Name::new(name))
+            .insert(WorldChunk);
 
-    let mut flat_plane_transform: Transform = Transform::from_xyz(0.0, 0.0, -1.3);
-    flat_plane_transform.rotation = Quat::from_rotation_x(utils::deg_to_rad(90.0));
-    commands
-        .spawn_bundle(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Plane { size: 50.0 })),
-            material: materials.add(Color::rgb(0.3, 1.0, 0.3).into()),
-            transform: flat_plane_transform,
-            ..default()
-        })
-        .insert(Name::new("Ground"));
+        i += 1;
+    }
     commands
         .spawn_bundle(SceneBundle {
             scene: asset_server.load("trashcan.gltf#Scene0"),
@@ -161,7 +182,7 @@ fn manage_tank_input(
             let rotation_angle: f32 = tank.angle as f32 + 90.0;
             let speed: f32 = 0.25;
             transform.translation.x += f32::cos(utils::deg_to_rad(rotation_angle)) * speed;
-            transform.translation.y += f32::sin(utils::deg_to_rad(rotation_angle)) * speed;
+            // transform.translation.y += f32::sin(utils::deg_to_rad(rotation_angle)) * speed;
         }
     }
 }
@@ -179,5 +200,19 @@ fn focus_tracking_camera(
             camera.translation.y = tank_transform.translation.y + f32::sin(utils::deg_to_rad(rotation_angle)) * camera_distance;
             break;
         }
+    }
+}
+
+fn update_ground_chunks(
+    keys: Res<Input<KeyCode>>,
+    mut chunks: Query<&mut Transform, With<WorldChunk>>
+) {
+    if !keys.pressed(KeyCode::Up) { return }
+    for mut chunk in &mut chunks {
+        chunk.translation.y -= 0.3;
+        if chunk.translation.y < -50.0 {
+            chunk.translation.y = 150.0;
+        }
+        chunk.translation.z = utils:: calc_world_curve_path(chunk.translation.y);
     }
 }
